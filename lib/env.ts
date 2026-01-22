@@ -1,0 +1,34 @@
+import { z } from "zod"
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  
+  // Database
+  DATABASE_URL: z.string().min(1),
+  
+  // Redis
+  REDIS_URL: z.string().min(1),
+  
+  // Finnhub (Stock Data)
+  FINNHUB_API_KEY: z.string().min(1),
+  
+  // OpenAI (LLM)
+  OPENAI_API_KEY: z.string().min(1),
+  OPENAI_MODEL: z.string().default("gpt-4o-mini"),
+  
+  // Auth
+  NEXTAUTH_SECRET: z.string().optional(),
+  NEXTAUTH_URL: z.string().optional(),
+  
+  // Scheduler
+  CRON_SECRET: z.string().min(1),
+})
+
+const _env = envSchema.safeParse(process.env)
+
+if (!_env.success) {
+  console.error("❌ Invalid environment variables:", _env.error.flatten().fieldErrors)
+  throw new Error("Invalid environment variables")
+}
+
+export const env = _env.data

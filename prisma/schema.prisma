@@ -1,0 +1,269 @@
+// Prisma schema for Stockast - US Stock Briefing Service
+// Database: PostgreSQL (Supabase)
+// Generated: 2024-01-21
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id                String            @id @default(cuid())
+  email             String            @unique
+  name              String?
+  phone             String?           @unique
+  phoneVerifiedAt   DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  preferences       UserPreference?
+  favoriteStocks    UserFavoriteStock[]
+  briefings         Briefing[]
+  events            UserEvent[]
+
+  @@map("users")
+}
+
+model UserPreference {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  language          String   @default("ko")
+  briefingStyle     String   @default("concise")
+  infoPreference    String   @default("all")
+  disclaimerAckAt   DateTime?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("user_preferences")
+}
+
+model UserFavoriteStock {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stockId           String
+  stock             Stock    @relation(fields: [stockId], references: [id])
+  rank              Int
+  createdAt         DateTime @default(now())
+
+  @@unique([userId, stockId])
+  @@unique([userId, rank])
+  @@map("user_favorite_stocks")
+}
+
+// ============================================
+// STOCK DATA
+// ============================================
+
+model Stock {
+  id                String   @id @default(cuid())
+  ticker            String
+  exchange          String   @default("NASDAQ")
+  nameKo            String?
+  nameEn            String
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  dailyPrices       DailyPrice[]
+  newsArticles      NewsArticleStock[]
+  userFavorites     UserFavoriteStock[]
+  popularityStats   PopularityDaily[]
+
+  @@unique([exchange, ticker])
+  @@map("stocks")
+}
+
+model DailyPrice {
+  id                String   @id @default(cuid())
+  stockId           String
+  stock             Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  
+  tradeDate         DateTime @db.Date
+  openPrice         Decimal? @db.Decimal(12, 2)
+  highPrice         Decimal? @db.Decimal(12, 2)
+  lowPrice          Decimal? @db.Decimal(12, 2)
+  closePrice        Decimal  @db.Decimal(12, 2)
+  changeAmount      Decimal? @db.Decimal(12, 2)
+  changePercent     Decimal? @db.Decimal(8, 4)
+  volume            BigInt?
+  
+  createdAt         DateTime @default(now())
+
+  @@unique([stockId, tradeDate])
+  @@map("daily_prices")
+}
+
+// ============================================
+// NEWS
+// ============================================
+
+model NewsArticle {
+  id                String   @id @default(cuid())
+  source            String
+  url               String   @unique
+  canonicalHash     String?
+  
+  title             String
+  content           String?  @db.Text
+  summary           String?  @db.Text
+  
+  publishedAt       DateTime
+  crawledAt         DateTime @default(now())
+  
+  // Relations
+  stocks            NewsArticleStock[]
+
+  @@index([publishedAt])
+  @@index([source])
+  @@map("news_articles")
+}
+
+model NewsArticleStock {
+  id                String      @id @default(cuid())
+  articleId         String
+  article           NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  stockId           String
+  stock             Stock       @relation(fields: [stockId], references: [id])
+  relevanceScore    Decimal?    @db.Decimal(4, 2)
+  
+  @@unique([articleId, stockId])
+  @@map("news_article_stocks")
+}
+
+// ============================================
+// BRIEFINGS & SUMMARIES
+// ============================================
+
+model Briefing {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  briefingDate      DateTime @db.Date
+  content           Json
+  model             String   @default("gpt-4o-mini")
+  promptVersion     Int      @default(1)
+  inputFingerprint  String?
+  
+  createdAt         DateTime @default(now())
+
+  @@unique([userId, briefingDate])
+  @@index([briefingDate])
+  @@map("briefings")
+}
+
+model MarketSummary {
+  id                String   @id @default(cuid())
+  summaryDate       DateTime @db.Date @unique
+  content           Json
+  model             String   @default("gpt-4o-mini")
+  promptVersion     Int      @default(1)
+  inputFingerprint  String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("market_summaries")
+}
+
+model StockSummary {
+  id                String   @id @default(cuid())
+  stockId           String
+  summaryDate       DateTime @db.Date
+  content           Json
+  model             String   @default("gpt-4o-mini")
+  promptVersion     Int      @default(1)
+  inputFingerprint  String?
+  
+  createdAt         DateTime @default(now())
+
+  @@unique([stockId, summaryDate])
+  @@map("stock_summaries")
+}
+
+// ============================================
+// POPULARITY & ANALYTICS
+// ============================================
+
+model UserEvent {
+  id                String   @id @default(cuid())
+  userId            String?
+  user              User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  eventType         String
+  stockId           String?
+  articleId         String?
+  meta              Json?
+  
+  createdAt         DateTime @default(now())
+
+  @@index([eventType, createdAt])
+  @@index([userId, createdAt])
+  @@map("user_events")
+}
+
+model PopularityDaily {
+  id                String   @id @default(cuid())
+  statDate          DateTime @db.Date
+  stockId           String
+  stock             Stock    @relation(fields: [stockId], references: [id])
+  
+  views             Int      @default(0)
+  clicks            Int      @default(0)
+  favorites         Int      @default(0)
+  totalEngagement   Int      @default(0)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([statDate, stockId])
+  @@index([statDate, totalEngagement])
+  @@map("popularity_daily")
+}
+
+model PopularInterest {
+  id                String   @id @default(cuid())
+  statDate          DateTime @db.Date @unique
+  topStocks         Json
+  trendingTopics    Json
+  generatedAt       DateTime @default(now())
+
+  @@map("popular_interests")
+}
+
+// ============================================
+// INGESTION TRACKING
+// ============================================
+
+model IngestRun {
+  id                String   @id @default(cuid())
+  runDate           DateTime @db.Date @unique
+  status            String   @default("pending")
+  
+  pricesCollected   Int      @default(0)
+  newsCollected     Int      @default(0)
+  summariesGenerated Int     @default(0)
+  
+  startedAt         DateTime?
+  completedAt       DateTime?
+  errorMessage      String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("ingest_runs")
+}
