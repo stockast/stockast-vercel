@@ -19,6 +19,8 @@ model User {
   id                String            @id @default(cuid())
   email             String            @unique
   name              String?
+  nickname          String?
+  avatarUrl         String?
   phone             String?           @unique
   phoneVerifiedAt   DateTime?
   createdAt         DateTime          @default(now())
@@ -37,12 +39,14 @@ model UserPreference {
   id                String   @id @default(cuid())
   userId            String   @unique
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   language          String   @default("ko")
   briefingStyle     String   @default("concise")
   infoPreference    String   @default("all")
+  newsletterEnabled Boolean  @default(false)
+  newsletterTime    String?
   disclaimerAckAt   DateTime?
-  
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,6 +32,13 @@ export default function OnboardingPage() {
     style: "concise",
     focus: "all",
   })
+
+  useEffect(() => {
+    const userId = localStorage.getItem("stockast_user_id")
+    if (userId) {
+      router.replace("/home")
+    }
+  }, [router])
 
   const handleNext = () => {
     if (step === 1) {
@@ -89,7 +96,7 @@ export default function OnboardingPage() {
         localStorage.setItem("stockast_user_id", result.userId)
       }
 
-      router.push("/briefing")
+      router.push("/home")
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다.")
     } finally {
@@ -98,8 +105,8 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg">
+    <div className="min-h-dvh bg-gray-50 flex items-center justify-center px-4 py-6">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-gray-900">
             Stockast에 오신 것을 환영합니다
@@ -128,7 +135,6 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 1: Basic Info */}
           {step === 1 && (
             <div className="space-y-4">
               <div className="space-y-2">
@@ -168,7 +174,6 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 2: Stock Selection */}
           {step === 2 && (
             <div className="space-y-4">
               <div className="text-center">
@@ -186,7 +191,6 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 3: Preferences */}
           {step === 3 && (
             <div className="space-y-4">
               <PreferenceSelector

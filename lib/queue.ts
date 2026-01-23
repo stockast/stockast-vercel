@@ -1,8 +1,10 @@
-import { db } from "@/lib/db"
 import Redis from "ioredis"
 import { env } from "@/lib/env"
 
 export const QUEUE_KEY = "stockast:jobs"
+
+export const DAILY_BRIEFING_QUEUE = "daily-briefing"
+export const POPULARITY_QUEUE = "popularity"
 
 // Build Redis URL
 const REDIS_URL = env.REDIS_URL || "redis://localhost:6379"

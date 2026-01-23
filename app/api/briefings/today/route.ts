@@ -5,10 +5,8 @@ import { getUserId } from "@/lib/auth/session"
 
 export async function GET(request: Request) {
   try {
-    // Try session auth first, fallback to query param
     let userId = await getUserId()
     
-    // If no session, try query param (for localStorage migration)
     if (!userId) {
       const { searchParams } = new URL(request.url)
       const queryUserId = searchParams.get("userId")
@@ -25,14 +23,12 @@ export async function GET(request: Request) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    // Check cache first
     const cacheKey = `briefing:${userId}:${today.toISOString()}`
     const cached = await getCached(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
     }
 
-    // Get user's briefing
     const briefing = await db.briefing.findUnique({
       where: {
         userId_briefingDate: {
@@ -71,9 +67,9 @@ export async function GET(request: Request) {
         rank: fs.rank,
       })),
       generatedAt: briefing.createdAt,
+      asOf: briefing.createdAt.toISOString(),
     }
 
-    // Cache for 24 hours
     await setCache(cacheKey, response, TTL.BRIEFING)
 
     return NextResponse.json(response)

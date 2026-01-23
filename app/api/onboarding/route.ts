@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import { processDailyBriefing } from "@/lib/jobs/dailyBriefing"
+
+function getKstDateString(now: Date) {
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+  return kst.toISOString().slice(0, 10)
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { name, email, phone, favorites, preferences } = body
 
-    // Validation
     if (!name || !email) {
       return NextResponse.json(
         { error: "이름과 이메일은 필수 입력 항목입니다." },
@@ -28,7 +33,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Check if user exists
     const existingUser = await db.user.findUnique({
       where: { email },
     })
@@ -40,9 +44,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create user and related data in transaction
     const user = await db.$transaction(async (tx: any) => {
-      // Create user
       const newUser = await tx.user.create({
         data: {
           name,
@@ -51,7 +53,6 @@ export async function POST(request: Request) {
         },
       })
 
-      // Create preferences
       await tx.userPreference.create({
         data: {
           userId: newUser.id,
@@ -61,11 +62,9 @@ export async function POST(request: Request) {
         },
       })
 
-      // Create favorite stocks
       for (let i = 0; i < favorites.length; i++) {
         const fav = favorites[i]
         
-        // Find or create stock
         let stock = await tx.stock.findUnique({
           where: { exchange_ticker: { exchange: "NASDAQ", ticker: fav.ticker } },
         })
@@ -91,6 +90,14 @@ export async function POST(request: Request) {
 
       return newUser
     })
+
+    const userCount = await db.user.count()
+    if (userCount === 1) {
+      const dateStr = getKstDateString(new Date())
+      processDailyBriefing({ date: dateStr }).catch((error) => {
+        console.error("Immediate briefing error:", error)
+      })
+    }
 
     return NextResponse.json({
       success: true,

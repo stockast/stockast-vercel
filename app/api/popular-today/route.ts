@@ -7,14 +7,12 @@ export async function GET() {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    // Check cache first
     const cacheKey = `popular:stocks:${today.toISOString()}`
     const cached = await getCached(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
     }
 
-    // Get popular interests for today
     const popular = await db.popularInterest.findUnique({
       where: { statDate: today },
     })
@@ -24,13 +22,13 @@ export async function GET() {
         date: popular.statDate,
         topStocks: popular.topStocks,
         trendingTopics: popular.trendingTopics,
+        asOf: popular.generatedAt.toISOString(),
       }
-      
+
       await setCache(cacheKey, response, TTL.POPULAR_STOCKS)
       return NextResponse.json(response)
     }
 
-    // If no aggregated data, calculate from events
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
 
@@ -57,8 +55,10 @@ export async function GET() {
         engagement: ps.totalEngagement,
       })),
       trendingTopics: [],
+      asOf: new Date().toISOString(),
     }
 
+    await setCache(cacheKey, response, TTL.POPULAR_STOCKS)
     return NextResponse.json(response)
   } catch (error) {
     console.error("Popular stocks error:", error)

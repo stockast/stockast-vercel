@@ -35,10 +35,11 @@ const CACHE_KEYS = {
 
 // TTL in seconds
 export const TTL = {
-  BRIEFING: 60 * 60 * 24,
-  POPULAR_STOCKS: 60 * 30,
+  BRIEFING: 6 * 60 * 60,
+  POPULAR_STOCKS: 30 * 60,
   STOCK_QUOTE: 60 * 5,
-  STOCK_NEWS: 60 * 30,
+  STOCK_NEWS: 24 * 60 * 60,
+  FEAR_GREED: 24 * 60 * 60,
 }
 
 // Get value from cache
