@@ -6,8 +6,10 @@ const envSchema = z.object({
   // Database
   DATABASE_URL: z.string().min(1),
   
-  // Redis
-  REDIS_URL: z.string().min(1),
+  // Redis (Upstash or local)
+  REDIS_URL: z.string().optional(),
+  UPSTASH_REDIS_REST_URL: z.string().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   
   // Finnhub (Stock Data)
   FINNHUB_API_KEY: z.string().min(1),

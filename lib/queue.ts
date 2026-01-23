@@ -1,68 +1,41 @@
-import { Queue, ConnectionOptions } from "bullmq"
+import { db } from "@/lib/db"
+import Redis from "ioredis"
 import { env } from "@/lib/env"
 
-// Parse Redis connection from URL or host/port
-const getConnection = (): ConnectionOptions => {
-  const url = process.env.REDIS_URL
-  if (url) {
-    return { connection: url } as ConnectionOptions
-  }
-  return {
-    host: process.env.REDIS_HOST || "localhost",
-    port: parseInt(process.env.REDIS_PORT || "6379"),
-  }
+export const QUEUE_KEY = "stockast:jobs"
+
+// Build Redis URL
+const REDIS_URL = env.REDIS_URL || "redis://localhost:6379"
+
+// Create Redis connection
+export const redis = new Redis(REDIS_URL, {
+  maxRetriesPerRequest: null,
+  retryStrategy: () => null,
+})
+
+// Schedule a job
+export async function scheduleJob(type: string, date: string, force = false) {
+  const jobData = JSON.stringify({ type, date, force, scheduledAt: new Date().toISOString() })
+  await redis.rpush(QUEUE_KEY, jobData)
+  console.log(`📤 Job scheduled: ${type} for ${date}`)
 }
 
-export const DAILY_BRIEFING_QUEUE = "daily-briefing"
-export const POPULARITY_QUEUE = "popularity"
-
-export const dailyBriefingQueue = new Queue(DAILY_BRIEFING_QUEUE, { connection: getConnection() })
-export const popularityQueue = new Queue(POPULARITY_QUEUE, { connection: getConnection() })
-
-export interface DailyBriefingJobData {
-  date: string
-  forceRegenerate?: boolean
-}
-
-export interface PopularityJobData {
-  date: string
-}
-
+// Schedule daily briefing
 export async function scheduleDailyBriefing(date: string, forceRegenerate = false) {
-  await dailyBriefingQueue.add(
-    "generate-briefing",
-    { date, forceRegenerate } as DailyBriefingJobData,
-    {
-      attempts: 3,
-      backoff: { type: "exponential", delay: 5000 },
-      removeOnComplete: 100,
-      removeOnFail: 50,
-    }
-  )
+  await scheduleJob("daily-briefing", date, forceRegenerate)
 }
 
+// Schedule popularity aggregation
 export async function schedulePopularityAggregation(date: string) {
-  await popularityQueue.add(
-    "aggregate-popularity",
-    { date } as PopularityJobData,
-    {
-      attempts: 1,
-      removeOnComplete: true,
-    }
-  )
+  await scheduleJob("popularity", date)
 }
 
+// Health check
 export async function checkQueueHealth() {
-  const [dailyBriefingCount, popularityCount] = await Promise.all([
-    dailyBriefingQueue.getWaitingCount(),
-    popularityQueue.getWaitingCount(),
-  ])
-  
-  return {
-    queues: {
-      [DAILY_BRIEFING_QUEUE]: { waiting: dailyBriefingCount },
-      [POPULARITY_QUEUE]: { waiting: popularityCount },
-    },
-    healthy: true,
+  try {
+    const len = await redis.llen(QUEUE_KEY)
+    return { healthy: true, waitingJobs: len }
+  } catch {
+    return { healthy: false, waitingJobs: 0 }
   }
 }

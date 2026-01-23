@@ -5,12 +5,20 @@ import { getUserId } from "@/lib/auth/session"
 
 export async function GET(request: Request) {
   try {
-    const userId = await getUserId()
+    // Try session auth first, fallback to query param
+    let userId = await getUserId()
+    
+    // If no session, try query param (for localStorage migration)
+    if (!userId) {
+      const { searchParams } = new URL(request.url)
+      const queryUserId = searchParams.get("userId")
+      userId = queryUserId || null
+    }
 
     if (!userId) {
       return NextResponse.json(
-        { error: "인증이 필요합니다." },
-        { status: 401 }
+        { error: "userId가 필요합니다." },
+        { status: 400 }
       )
     }
 

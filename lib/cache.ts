@@ -1,8 +1,28 @@
 import Redis from "ioredis"
 import { env } from "@/lib/env"
 
-const redis = new Redis(env.REDIS_URL, {
+// Build Redis URL from Upstash or use existing REDIS_URL
+let redisUrl = ""
+if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
+  const url = new URL(env.UPSTASH_REDIS_REST_URL)
+  redisUrl = `rediss://:${env.UPSTASH_REDIS_REST_TOKEN}@${url.hostname}:37561`
+} else {
+  redisUrl = env.REDIS_URL || "redis://localhost:6379"
+}
+
+console.log(`[Cache] Redis: ${redisUrl.substring(0, 60)}...`)
+
+const redis = new Redis(redisUrl, {
   maxRetriesPerRequest: null,
+  retryStrategy: (times) => null,
+})
+
+redis.on('connect', () => {
+  console.log('[Cache] Redis connected!')
+})
+
+redis.on('error', (err) => {
+  console.log(`[Cache] Redis error: ${err.message}`)
 })
 
 // Cache keys
