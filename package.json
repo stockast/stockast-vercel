@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "postinstall": "prisma generate",
     "worker": "ts-node -r tsconfig-paths/register -r dotenv/config --project tsconfig.worker.json lib/workers/worker.ts",
     "worker:simple": "ts-node -r tsconfig-paths/register -r dotenv/config --project tsconfig.worker.json lib/workers/simple-worker.ts",
     "worker:popularity": "ts-node -r tsconfig-paths/register -r dotenv/config --project tsconfig.worker.json lib/workers/popularity-worker.ts",
