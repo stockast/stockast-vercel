@@ -1,43 +1,44 @@
-import Redis from "ioredis"
+import { Queue } from "bullmq"
 import { env } from "@/lib/env"
-
-export const QUEUE_KEY = "stockast:jobs"
+import { bullmqConnectionFromUrl } from "@/lib/workers/bullmqConnection"
 
 export const DAILY_BRIEFING_QUEUE = "daily-briefing"
 export const POPULARITY_QUEUE = "popularity"
 
-// Build Redis URL
-const REDIS_URL = env.REDIS_URL || "redis://localhost:6379"
-
-// Create Redis connection
-export const redis = new Redis(REDIS_URL, {
-  maxRetriesPerRequest: null,
-  retryStrategy: () => null,
-})
-
-// Schedule a job
-export async function scheduleJob(type: string, date: string, force = false) {
-  const jobData = JSON.stringify({ type, date, force, scheduledAt: new Date().toISOString() })
-  await redis.rpush(QUEUE_KEY, jobData)
-  console.log(`📤 Job scheduled: ${type} for ${date}`)
-}
-
-// Schedule daily briefing
-export async function scheduleDailyBriefing(date: string, forceRegenerate = false) {
-  await scheduleJob("daily-briefing", date, forceRegenerate)
-}
-
-// Schedule popularity aggregation
-export async function schedulePopularityAggregation(date: string) {
-  await scheduleJob("popularity", date)
-}
-
-// Health check
-export async function checkQueueHealth() {
-  try {
-    const len = await redis.llen(QUEUE_KEY)
-    return { healthy: true, waitingJobs: len }
-  } catch {
-    return { healthy: false, waitingJobs: 0 }
+function getRedisUrl(): string {
+  if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
+    const url = new URL(env.UPSTASH_REDIS_REST_URL)
+    return `rediss://:${env.UPSTASH_REDIS_REST_TOKEN}@${url.hostname}:37561`
   }
+  return env.REDIS_URL || "redis://localhost:6379"
+}
+
+const redisUrl = getRedisUrl()
+const connection = bullmqConnectionFromUrl(redisUrl)
+
+const dailyBriefingQueue = new Queue(DAILY_BRIEFING_QUEUE, { connection })
+const popularityQueue = new Queue(POPULARITY_QUEUE, { connection })
+
+export async function scheduleDailyBriefing(date: string, forceRegenerate = false) {
+  await dailyBriefingQueue.add(
+    "generate-briefing",
+    { date, forceRegenerate },
+    {
+      jobId: `daily-briefing:${date}${forceRegenerate ? ":force" : ""}`,
+      removeOnComplete: { age: 24 * 60 * 60, count: 100 },
+      removeOnFail: { age: 7 * 24 * 60 * 60, count: 50 },
+    }
+  )
+}
+
+export async function schedulePopularityAggregation(date: string) {
+  await popularityQueue.add(
+    "aggregate-popularity",
+    { date },
+    {
+      jobId: `popularity:${date}`,
+      removeOnComplete: { age: 24 * 60 * 60, count: 100 },
+      removeOnFail: { age: 7 * 24 * 60 * 60, count: 50 },
+    }
+  )
 }

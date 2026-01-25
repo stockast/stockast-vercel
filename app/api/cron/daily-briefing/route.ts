@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
-import { scheduleDailyBriefing } from "@/lib/queue"
+import { scheduleDailyBriefing, schedulePopularityAggregation } from "@/lib/queue"
 import { env } from "@/lib/env"
+import { getKstNow } from "@/lib/dates"
 
 export async function GET(request: Request) {
   try {
@@ -17,15 +18,20 @@ export async function GET(request: Request) {
     const today = dateParam 
       ? new Date(dateParam) 
       : new Date()
-    
-    const dateStr = today.toISOString().split("T")[0]
+
+    const dateStr = getKstNow(today).toISOString().split("T")[0]
+
+    const force = searchParams.get("force") === "true"
 
     // Enqueue the daily briefing job
-    await scheduleDailyBriefing(dateStr, searchParams.get("force") === "true")
+    await scheduleDailyBriefing(dateStr, force)
+
+    // Enqueue popularity aggregation for the same edition date
+    await schedulePopularityAggregation(dateStr)
 
     return NextResponse.json({
       success: true,
-      message: `Daily briefing job enqueued for ${dateStr}`,
+      message: `Daily briefing + popularity jobs enqueued for ${dateStr}`,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {

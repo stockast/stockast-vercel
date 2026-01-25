@@ -16,6 +16,7 @@ export default function MyPage() {
   const { profile, isLoading, error, fetchProfile, updateProfile, updateAccount, updatePreferences } = useUserStore()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [editOpen, setEditOpen] = useState(false)
+  const [logosByTicker, setLogosByTicker] = useState<Record<string, string | null>>({})
   const [draft, setDraft] = useState({
     nickname: '',
     name: '',
@@ -28,6 +29,29 @@ export default function MyPage() {
   }, [fetchProfile])
 
   useEffect(() => {
+    const fetchLogos = async () => {
+      if (!profile) return
+      const tickers = profile.favoriteStocks.map((s) => s.ticker).filter(Boolean)
+      if (tickers.length === 0) return
+
+      try {
+        const res = await fetch(`/api/stocks/logos?tickers=${encodeURIComponent(tickers.join(','))}`)
+        if (!res.ok) return
+        const data = await res.json()
+        const next: Record<string, string | null> = {}
+        for (const item of data.logos || []) {
+          if (item?.ticker) next[item.ticker] = item.logoUrl ?? null
+        }
+        setLogosByTicker(next)
+      } catch {
+        // ignore
+      }
+    }
+
+    fetchLogos()
+  }, [profile])
+
+  const syncDraftFromProfile = () => {
     if (!profile) return
     setDraft({
       nickname: profile.nickname || '',
@@ -35,7 +59,7 @@ export default function MyPage() {
       email: profile.email || '',
       phone: profile.phone || '',
     })
-  }, [profile])
+  }
 
   const handleNewsletterToggle = (enabled: boolean) => {
     updatePreferences({ newsletterEnabled: enabled })
@@ -102,6 +126,7 @@ export default function MyPage() {
               <DropdownMenuContent align="start">
                 <DropdownMenuItem
                   onClick={() => updateProfile({ avatarUrl: null })}
+                  className="text-red-600 focus:text-red-600"
                 >
                   프로필 사진 삭제
                 </DropdownMenuItem>
@@ -112,7 +137,13 @@ export default function MyPage() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="font-medium truncate">{profile.nickname || '닉네임을 설정해주세요'}</p>
-                <Sheet open={editOpen} onOpenChange={setEditOpen}>
+                <Sheet
+                  open={editOpen}
+                  onOpenChange={(open) => {
+                    setEditOpen(open)
+                    if (open) syncDraftFromProfile()
+                  }}
+                >
                   <SheetTrigger asChild>
                     <button type="button" aria-label="설정" className="p-1 rounded-md hover:bg-gray-100">
                       <Settings className="h-4 w-4 text-gray-600" />
@@ -213,11 +244,30 @@ export default function MyPage() {
           <CardTitle>관심 종목</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            {profile.favoriteStocks.map((stock) => (
-              <div key={stock.ticker} className="flex justify-between">
-                <span>{stock.ticker} - {stock.name}</span>
-                <span>순위: {stock.rank}</span>
+          <div className="rounded-2xl border bg-white overflow-hidden">
+            {profile.favoriteStocks.map((stock, idx) => (
+              <div
+                key={stock.ticker}
+                className="flex items-center justify-between px-4 py-3 border-b last:border-b-0"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`w-6 text-center text-sm font-bold ${idx < 3 ? 'text-gray-900' : 'text-gray-400'}`}>
+                    {stock.rank}
+                  </span>
+                  <Avatar className="h-10 w-10 rounded-xl bg-gray-100 border border-gray-200">
+                    <AvatarImage src={logosByTicker[stock.ticker] || undefined} alt={stock.ticker} />
+                    <AvatarFallback className="text-xs font-bold text-gray-600">
+                      {stock.ticker.slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{stock.ticker}</p>
+                    <p className="text-xs text-gray-500 truncate">{stock.name}</p>
+                  </div>
+                </div>
+                <div className="text-xs font-semibold text-gray-600 bg-gray-100 rounded-full px-3 py-1">
+                  관심
+                </div>
               </div>
             ))}
           </div>

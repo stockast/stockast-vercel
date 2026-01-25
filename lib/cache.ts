@@ -14,7 +14,10 @@ console.log(`[Cache] Redis: ${redisUrl.substring(0, 60)}...`)
 
 const redis = new Redis(redisUrl, {
   maxRetriesPerRequest: null,
-  retryStrategy: (times) => null,
+  retryStrategy: (times) => {
+    void times
+    return null
+  },
 })
 
 redis.on('connect', () => {
@@ -26,7 +29,7 @@ redis.on('error', (err) => {
 })
 
 // Cache keys
-const CACHE_KEYS = {
+export const CACHE_KEYS = {
   BRIEFING: (userId: string, date: string) => `briefing:${userId}:${date}`,
   POPULAR_STOCKS: (date: string) => `popular:stocks:${date}`,
   STOCK_QUOTE: (ticker: string) => `stock:quote:${ticker}`,
@@ -44,23 +47,35 @@ export const TTL = {
 
 // Get value from cache
 export async function getCached<T>(key: string): Promise<T | null> {
-  const value = await redis.get(key)
-  if (!value) return null
   try {
-    return JSON.parse(value) as T
+    const value = await redis.get(key)
+    if (!value) return null
+    try {
+      return JSON.parse(value) as T
+    } catch {
+      return null as T
+    }
   } catch {
-    return null as T
+    return null
   }
 }
 
 // Set value in cache
 export async function setCache(key: string, value: unknown, ttlSeconds: number) {
-  await redis.setex(key, ttlSeconds, JSON.stringify(value))
+  try {
+    await redis.setex(key, ttlSeconds, JSON.stringify(value))
+  } catch {
+    // ignore cache write failures
+  }
 }
 
 // Delete from cache
 export async function invalidateCache(key: string) {
-  await redis.del(key)
+  try {
+    await redis.del(key)
+  } catch {
+    // ignore cache delete failures
+  }
 }
 
 // Get or set pattern
@@ -79,7 +94,11 @@ export async function getOrSet<T>(
 
 // Invalidate multiple keys
 export async function invalidateMultiple(keys: string[]) {
-  await redis.del(...keys)
+  try {
+    await redis.del(...keys)
+  } catch {
+    // ignore
+  }
 }
 
 // Health check

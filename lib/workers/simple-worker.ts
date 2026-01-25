@@ -16,7 +16,11 @@ const redis = new Redis(REDIS_URL, {
 
 const QUEUE_KEY = "stockast:jobs"
 
-async function processJob(data: any) {
+type QueuedJob =
+  | { type: "daily-briefing"; date: string; force?: boolean }
+  | { type: "popularity"; date: string }
+
+async function processJob(data: QueuedJob) {
   console.log(`📋 Processing:`, data)
   
   try {
@@ -44,17 +48,18 @@ async function startWorker() {
       const result = await redis.brpop(QUEUE_KEY, 3)
       
       if (result) {
-        const [queueName, jobDataStr] = result
-        const jobData = JSON.parse(jobDataStr)
+        const [, jobDataStr] = result
+        const jobData = JSON.parse(jobDataStr) as QueuedJob
         
         await processJob(jobData)
         
         // Remove from queue after processing
         redis.lrem(QUEUE_KEY, 1, jobDataStr)
       }
-    } catch (error: any) {
-      if (error.message !== 'Connection is closed.') {
-        console.error('❌ Error:', error.message)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (message !== 'Connection is closed.') {
+        console.error('❌ Error:', message)
       }
       await new Promise(r => setTimeout(r, 1000))
     }

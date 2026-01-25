@@ -1,6 +1,7 @@
 import { Worker } from "bullmq"
 import { aggregatePopularity } from "@/lib/jobs/popularity"
 import { POPULARITY_QUEUE } from "@/lib/queue"
+import { bullmqConnectionFromUrl } from "@/lib/workers/bullmqConnection"
 
 // Build Redis URL
 let redisUrl = ""
@@ -36,7 +37,7 @@ async function startPopularityWorker() {
       }
     },
     {
-      connection: redisUrl as any,
+      connection: bullmqConnectionFromUrl(redisUrl),
       concurrency: 1,
       removeOnComplete: {
         age: 24 * 60 * 60,

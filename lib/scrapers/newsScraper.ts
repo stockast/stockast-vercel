@@ -1,4 +1,4 @@
-import { chromium, Browser } from "playwright"
+import { chromium, Browser, Page } from "playwright"
 import { db } from "@/lib/db"
 import crypto from "crypto"
 
@@ -80,12 +80,15 @@ class NewsScraper {
   }
 
   private async scrapeYahooFinance(
-    page: any,
+    page: Page,
     symbol: string,
     fromDate: Date,
     toDate: Date
   ): Promise<ScrapedArticle[]> {
     const articles: ScrapedArticle[] = []
+
+    void fromDate
+    void toDate
 
     await page.goto(`https://finance.yahoo.com/quote/${symbol}`, {
       waitUntil: "networkidle",

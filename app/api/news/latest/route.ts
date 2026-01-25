@@ -1,22 +1,11 @@
 import { NextResponse } from "next/server"
-import { finnhub } from "@/lib/clients/finnhub"
+import { finnhub, NewsArticle } from "@/lib/clients/finnhub"
 import { getCached, setCache, TTL } from "@/lib/cache"
-
-function getKstNow(now: Date) {
-  return new Date(now.getTime() + 9 * 60 * 60 * 1000)
-}
-
-function kstEditionDateString(now: Date) {
-  const kst = getKstNow(now)
-  const edition = new Date(kst)
-  if (kst.getHours() < 8) {
-    edition.setDate(edition.getDate() - 1)
-  }
-  return edition.toISOString().slice(0, 10)
-}
+import { summarizeNewsToKorean } from "@/lib/clients/openai"
+import { kstEditionYmd } from "@/lib/dates"
 
 function secondsUntilNextKst0800(now: Date) {
-  const kst = getKstNow(now)
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
   const next = new Date(kst)
   next.setHours(8, 0, 0, 0)
   if (kst.getTime() >= next.getTime()) {
@@ -31,7 +20,7 @@ function secondsUntilNextKst0800(now: Date) {
 export async function GET() {
   try {
     const now = new Date()
-    const editionDate = kstEditionDateString(now)
+    const editionDate = kstEditionYmd(now)
     const cacheKey = `news:edition:${editionDate}`
 
     const cached = await getCached(cacheKey)
@@ -39,19 +28,70 @@ export async function GET() {
       return NextResponse.json(cached)
     }
 
-    const news = await finnhub.getGeneralNews('general')
+    const news = await finnhub.getGeneralNews("general")
+
+    if (!Array.isArray(news) || news.length === 0) {
+      return NextResponse.json(
+        { error: "뉴스 원문을 가져오지 못했습니다." },
+        { status: 502 }
+      )
+    }
+
+    const baseItems = news.slice(0, 10).map((item: NewsArticle) => ({
+      id: item.id?.toString() || item.headline,
+      title: item.headline,
+      source: item.source,
+      url: item.url,
+      publishedAt: new Date(item.datetime * 1000).toISOString(),
+      summary: item.summary,
+      image: item.image,
+      related: item.related,
+    }))
+
+    let koById = new Map<string, { titleKo: string; summaryKo: string }>()
+    try {
+      const ko = await summarizeNewsToKorean(
+        baseItems.map((i) => ({ id: i.id, title: i.title, summary: i.summary, source: i.source }))
+      )
+      koById = new Map(ko.map((k) => [k.id, { titleKo: k.titleKo, summaryKo: k.summaryKo }]))
+    } catch (error) {
+      console.error("News summarize error:", error)
+      return NextResponse.json(
+        { error: "뉴스 요약 생성에 실패했습니다." },
+        { status: 500 }
+      )
+    }
+
+    let missing = baseItems.filter((i) => !koById.has(i.id))
+    if (missing.length > 0) {
+      // Retry once for missing items (LLM sometimes returns partial lists)
+      try {
+        const ko = await summarizeNewsToKorean(
+          missing.map((i) => ({ id: i.id, title: i.title, summary: i.summary, source: i.source }))
+        )
+        for (const k of ko) {
+          koById.set(k.id, { titleKo: k.titleKo, summaryKo: k.summaryKo })
+        }
+      } catch (error) {
+        console.error("News summarize retry error:", error)
+      }
+
+      missing = baseItems.filter((i) => !koById.has(i.id))
+      if (missing.length > 0) {
+        console.error("News summarize missing items:", missing.map((m) => m.id))
+        return NextResponse.json(
+          { error: "뉴스 요약 결과가 일부 누락되었습니다." },
+          { status: 500 }
+        )
+      }
+    }
 
     const result = {
       editionDate,
-      news: news.slice(0, 10).map((item: any) => ({
-        id: item.id?.toString() || item.headline,
-        title: item.headline,
-        source: item.source,
-        url: item.url,
-        publishedAt: new Date(item.datetime * 1000).toISOString(),
-        summary: item.summary,
-        image: item.image,
-        related: item.related,
+      news: baseItems.map((i) => ({
+        ...i,
+        titleKo: koById.get(i.id)?.titleKo || "",
+        summaryKo: koById.get(i.id)?.summaryKo || "",
       })),
       asOf: now.toISOString(),
     }

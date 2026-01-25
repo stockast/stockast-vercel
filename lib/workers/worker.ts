@@ -2,6 +2,7 @@ import { Worker } from "bullmq"
 import { processDailyBriefing } from "@/lib/jobs/dailyBriefing"
 import { aggregatePopularity } from "@/lib/jobs/popularity"
 import { DAILY_BRIEFING_QUEUE } from "@/lib/queue"
+import { bullmqConnectionFromUrl } from "@/lib/workers/bullmqConnection"
 
 // Build Redis URL for worker
 let redisUrl = ""
@@ -39,7 +40,7 @@ async function startWorker() {
       }
     },
     {
-      connection: redisUrl as any,
+      connection: bullmqConnectionFromUrl(redisUrl),
       concurrency: 1,
       removeOnComplete: {
         age: 24 * 60 * 60,

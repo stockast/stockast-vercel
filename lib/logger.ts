@@ -1,10 +1,8 @@
-import { db } from "@/lib/db"
-
 interface LogEntry {
   level: "info" | "warn" | "error"
   category: string
   message: string
-  context?: Record<string, any>
+  context?: Record<string, unknown>
   timestamp?: Date
 }
 
@@ -28,7 +26,7 @@ export async function log(entry: LogEntry) {
 export async function logBriefingJob(
   jobId: string,
   status: "started" | "completed" | "failed",
-  details?: Record<string, any>
+  details?: Record<string, unknown>
 ) {
   await log({
     level: status === "failed" ? "error" : "info",
@@ -41,7 +39,7 @@ export async function logBriefingJob(
 export async function logError(
   category: string,
   error: Error,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ) {
   await log({
     level: "error",
@@ -57,5 +55,6 @@ export async function logError(
 export async function getRecentLogs(limit: number = 100) {
   // For now, just return from console/logging system
   // In production, you'd query from a database or logging service
+  void limit
   return []
 }

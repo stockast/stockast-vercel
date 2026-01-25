@@ -27,7 +27,14 @@ export async function aggregatePopularity(job: PopularityJobData) {
 
     console.log(`[Popularity] Found ${activeStocks.length} active stocks`)
 
-    const results: Array<{ ticker: string; name: string; views: number; clicks: number; favorites: number }> = []
+    const results: Array<{
+      ticker: string
+      name: string
+      views: number
+      clicks: number
+      favorites: number
+      totalEngagement: number
+    }> = []
 
     for (const { stockId } of activeStocks) {
       if (!stockId) continue
@@ -72,17 +79,16 @@ export async function aggregatePopularity(job: PopularityJobData) {
         select: { ticker: true, nameEn: true },
       })
 
-      if (stock) {
+       if (stock) {
+        const totalEngagement = views + clicks * 2 + favEvents * 3
         results.push({
           ticker: stock.ticker,
           name: stock.nameEn,
           views,
           clicks,
           favorites: favEvents,
+          totalEngagement,
         })
-
-        // Calculate total engagement
-        const totalEngagement = views + clicks * 2 + favEvents * 3
 
         // Upsert daily popularity
         await db.popularityDaily.upsert({
@@ -110,15 +116,18 @@ export async function aggregatePopularity(job: PopularityJobData) {
       }
     }
 
-    // Sort by engagement and get top 10
+    // Sort by engagement and get top 50
     const topStocks = results
-      .sort((a, b) => (b.views + b.clicks * 2 + b.favorites * 3) - (a.views + a.clicks * 2 + a.favorites * 3))
-      .slice(0, 10)
+      .sort((a, b) => b.totalEngagement - a.totalEngagement)
+      .slice(0, 50)
       .map((s, i) => ({
         rank: i + 1,
         ticker: s.ticker,
         name: s.name,
-        score: s.views + s.clicks * 2 + s.favorites * 3,
+        views: s.views,
+        clicks: s.clicks,
+        favorites: s.favorites,
+        totalEngagement: s.totalEngagement,
       }))
 
     // Create PopularInterest record

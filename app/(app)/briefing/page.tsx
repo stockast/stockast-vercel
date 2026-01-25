@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { TrendingUp, TrendingDown, RefreshCw, Clock, Star } from "lucide-react"
+import { RefreshCw, Clock, Star } from "lucide-react"
 import { PopularToday } from "@/components/popular/PopularToday"
 
 interface BriefingContent {
@@ -32,7 +32,7 @@ export default function BriefingPage() {
   } | null>(null)
   const [error, setError] = useState("")
 
-  const fetchBriefing = async () => {
+  const fetchBriefing = async (opts?: { refresh?: boolean; force?: boolean }) => {
     setLoading(true)
     setError("")
 
@@ -44,7 +44,11 @@ export default function BriefingPage() {
     }
 
     try {
-      const response = await fetch(`/api/briefings/today?userId=${userId}`)
+      const params = new URLSearchParams({ userId })
+      if (opts?.refresh) params.set("refresh", "true")
+      if (opts?.force) params.set("force", "true")
+
+      const response = await fetch(`/api/briefings/today?${params.toString()}`)
       const data = await response.json()
 
       if (!response.ok) {
@@ -81,7 +85,7 @@ export default function BriefingPage() {
         <Card className="w-full max-w-lg">
           <CardContent className="pt-6 text-center">
             <p className="text-red-600 mb-4">{error}</p>
-            <Button onClick={fetchBriefing}>다시 시도</Button>
+             <Button onClick={() => fetchBriefing()}>다시 시도</Button>
           </CardContent>
         </Card>
       </div>
@@ -105,7 +109,7 @@ export default function BriefingPage() {
             <p className="text-sm text-gray-500">
               {briefing?.nextUpdate || "매일 오전 8시 30분에 업데이트됩니다."}
             </p>
-            <Button onClick={fetchBriefing} className="w-full">
+             <Button onClick={() => fetchBriefing({ refresh: true })} className="w-full">
               <RefreshCw className="mr-2 h-4 w-4" />
               새로고침
             </Button>
@@ -121,13 +125,23 @@ export default function BriefingPage() {
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-gray-900">오늘의 브리핑</h1>
-          <span className="text-sm text-gray-500">
-            {new Date(briefing.date).toLocaleDateString("ko-KR", {
-              month: "long",
-              day: "numeric",
-              weekday: "long",
-            })}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">
+              {new Date(briefing.date).toLocaleDateString("ko-KR", {
+                month: "long",
+                day: "numeric",
+                weekday: "long",
+              })}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="브리핑 새로고침"
+              onClick={() => fetchBriefing({ refresh: true })}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </header>
 

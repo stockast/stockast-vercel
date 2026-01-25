@@ -21,7 +21,7 @@ export interface NewsItem {
   datetime: number
 }
 
-export interface BriefingResult {
+export interface BriefingResult extends Record<string, unknown> {
   marketOverview: string
   stockSummaries: Array<{
     ticker: string
@@ -31,6 +31,65 @@ export interface BriefingResult {
     outlook: string
   }>
   dailySummary: string
+}
+
+export interface NewsKoreanItem {
+  id: string
+  titleKo: string
+  summaryKo: string
+}
+
+export async function summarizeNewsToKorean(
+  items: Array<{ id: string; title: string; summary?: string; source?: string }>
+): Promise<NewsKoreanItem[]> {
+  if (items.length === 0) return []
+
+  const model = env.OPENAI_MODEL
+
+  const systemPrompt = `당신은 한국어 뉴스 편집자입니다.
+
+요구사항:
+- 어떤 언어로 들어오든지 한국어로 자연스럽게 번역/요약
+- 과장 금지, 사실 중심
+- 제목은 30자 이내
+- 요약은 1000자 이내 (최대 3문장)
+- 투자 조언 금지
+- 출력은 JSON만`
+
+  const userPrompt = `다음 뉴스 목록을 한국어로 제목/요약을 만들어주세요.
+
+입력 JSON:
+${JSON.stringify(items)}
+
+출력 형식(JSON):
+{
+  "items": [
+    { "id": "...", "titleKo": "...", "summaryKo": "..." }
+  ]
+}`
+
+  const response = await openai.chat.completions.create({
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.3,
+    max_tokens: 1500,
+  })
+
+  const content = response.choices[0]?.message?.content
+  if (!content) throw new Error("No response from OpenAI")
+
+  const parsed = JSON.parse(content) as { items?: NewsKoreanItem[] }
+  if (!Array.isArray(parsed.items)) return []
+
+  return parsed.items.map((i) => ({
+    ...i,
+    titleKo: (i.titleKo || "").slice(0, 30),
+    summaryKo: (i.summaryKo || "").slice(0, 1000),
+  }))
 }
 
 export async function generateStockBriefing(

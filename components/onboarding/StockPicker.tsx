@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { X, Search, Loader2, TrendingUp, DollarSign } from "lucide-react"
@@ -199,6 +198,7 @@ export function StockPicker({ selected, onChange, max }: StockPickerProps) {
                   className="w-full flex items-center gap-3 rounded-2xl border bg-white px-4 py-3 text-left disabled:opacity-50"
                 >
                   <div className="h-10 w-10 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={LOGO_BY_TICKER[stock.ticker]}
                       alt=""
@@ -237,6 +237,7 @@ export function StockPicker({ selected, onChange, max }: StockPickerProps) {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="h-10 w-10 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={LOGO_BY_TICKER[stock.ticker]}
                         alt=""
