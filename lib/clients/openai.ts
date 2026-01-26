@@ -1,9 +1,20 @@
 import OpenAI from "openai"
 import { env } from "@/lib/env"
 
-const openai = new OpenAI({
-  apiKey: env.OPENAI_API_KEY,
-})
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient() {
+  const apiKey = env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not set")
+  }
+
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey })
+  }
+
+  return openaiClient
+}
 
 function safeJsonParse<T>(value: string): T | null {
   try {
@@ -76,6 +87,7 @@ ${JSON.stringify(items)}
   ]
 }`
 
+  const openai = getOpenAIClient()
   const response = await openai.chat.completions.create({
     model,
     messages: [
@@ -169,6 +181,7 @@ JSON으로 출력:
 }`
 
   try {
+    const openai = getOpenAIClient()
     const response = await openai.chat.completions.create({
       model,
       messages: [
@@ -205,6 +218,7 @@ export async function generateMarketSummary(
     topLosers: Array<{ ticker: string; change: number }>
   }
 ): Promise<string> {
+  const openai = getOpenAIClient()
   const response = await openai.chat.completions.create({
     model: env.OPENAI_MODEL,
     messages: [
@@ -235,5 +249,3 @@ Dow Jones: ${marketData.dowJonesChange >= 0 ? "+" : ""}${marketData.dowJonesChan
 
   return response.choices[0]?.message?.content || "시장 데이터를 불러올 수 없습니다."
 }
-
-export { openai }

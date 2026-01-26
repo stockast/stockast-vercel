@@ -47,10 +47,17 @@ class FinnhubClient {
   private rateLimitChain: Promise<void> = Promise.resolve()
 
   constructor() {
-    this.apiKey = env.FINNHUB_API_KEY
+    this.apiKey = env.FINNHUB_API_KEY || ""
+  }
+
+  private ensureConfigured() {
+    if (!this.apiKey) {
+      throw new Error("FINNHUB_API_KEY is not set")
+    }
   }
 
   private async request<T>(endpoint: string, params: Record<string, string> = {}) {
+    this.ensureConfigured()
     const response = await axios.get(`${FINNHUB_BASE_URL}${endpoint}`, {
       params: {
         ...params,
