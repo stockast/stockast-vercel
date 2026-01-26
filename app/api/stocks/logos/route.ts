@@ -20,21 +20,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ logos: [] satisfies LogoItem[] })
     }
 
-    const logos: LogoItem[] = []
-    for (const ticker of tickers) {
-      const cacheKey = `stock:logo:${ticker}`
-      const cached = await getCached<LogoItem>(cacheKey)
-      if (cached) {
-        logos.push(cached)
-        continue
-      }
+    const logos = (
+      await Promise.all(
+        tickers.map(async (ticker) => {
+          const cacheKey = `stock:logo:${ticker}`
+          const cached = await getCached<LogoItem>(cacheKey)
+          if (cached) return cached
 
-      const profile = await finnhub.getCompanyProfile(ticker)
-      const logoUrl = profile?.logo ? String(profile.logo) : null
-      const item: LogoItem = { ticker, logoUrl }
-      await setCache(cacheKey, item, LOGO_TTL_SECONDS)
-      logos.push(item)
-    }
+          const profile = await finnhub.getCompanyProfile(ticker)
+          const logoUrl = profile?.logo ? String(profile.logo) : null
+          const item: LogoItem = { ticker, logoUrl }
+          await setCache(cacheKey, item, LOGO_TTL_SECONDS)
+          return item
+        })
+      )
+    ).filter((item): item is LogoItem => Boolean(item))
 
     return NextResponse.json({ logos, asOf: new Date().toISOString() })
   } catch (error) {

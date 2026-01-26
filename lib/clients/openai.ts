@@ -5,6 +5,14 @@ const openai = new OpenAI({
   apiKey: env.OPENAI_API_KEY,
 })
 
+function safeJsonParse<T>(value: string): T | null {
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return null
+  }
+}
+
 export interface StockData {
   ticker: string
   name: string
@@ -82,7 +90,10 @@ ${JSON.stringify(items)}
   const content = response.choices[0]?.message?.content
   if (!content) throw new Error("No response from OpenAI")
 
-  const parsed = JSON.parse(content) as { items?: NewsKoreanItem[] }
+  const parsed = safeJsonParse<{ items?: NewsKoreanItem[] }>(content)
+  if (!parsed) {
+    throw new Error("Invalid JSON from OpenAI")
+  }
   if (!Array.isArray(parsed.items)) return []
 
   return parsed.items.map((i) => ({
@@ -174,7 +185,11 @@ JSON으로 출력:
       throw new Error("No response from OpenAI")
     }
 
-    return JSON.parse(content) as BriefingResult
+    const parsed = safeJsonParse<BriefingResult>(content)
+    if (!parsed) {
+      throw new Error("Invalid JSON from OpenAI")
+    }
+    return parsed
   } catch (error) {
     console.error("Error generating briefing:", error)
     throw error

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useUserStore } from '@/lib/stores/userStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -101,12 +102,18 @@ export default function MyPage() {
   }
 
   if (isLoading) return <RouteLoader />
-  if (error) return <div>오류: {error}</div>
+  if (error) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        오류: {error}
+      </div>
+    )
+  }
   if (!profile) return <div>프로필을 찾을 수 없습니다.</div>
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <h1 className="text-2xl font-bold">마이페이지</h1>
+    <div className="space-y-6">
+      <h1 className="text-xl font-bold text-gray-900">마이페이지</h1>
 
       <Card>
         <CardHeader>
@@ -186,13 +193,9 @@ export default function MyPage() {
                           onChange={(e) => setDraft((prev) => ({ ...prev, phone: e.target.value }))}
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={saveEdits}
-                        className="w-full h-11 rounded-xl bg-black text-white font-semibold"
-                      >
+                      <Button type="button" onClick={saveEdits} className="w-full h-11 rounded-xl">
                         저장
-                      </button>
+                      </Button>
                     </div>
                   </SheetContent>
                 </Sheet>

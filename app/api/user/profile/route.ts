@@ -26,15 +26,8 @@ const profileSchema = z.object({
 })
 
 async function resolveUserId(request: Request) {
-  let userId = await getUserId()
-
-  if (!userId) {
-    const { searchParams } = new URL(request.url)
-    const queryUserId = searchParams.get("userId")
-    userId = queryUserId || null
-  }
-
-  return userId
+  void request
+  return await getUserId()
 }
 
 async function getProfile(userId: string) {
@@ -81,8 +74,8 @@ export async function GET(request: Request) {
 
     if (!userId) {
       return NextResponse.json(
-        { error: "userId가 필요합니다." },
-        { status: 400 }
+        { error: "인증이 필요합니다." },
+        { status: 401 }
       )
     }
 
@@ -110,8 +103,8 @@ export async function PATCH(request: Request) {
 
     if (!userId) {
       return NextResponse.json(
-        { error: "userId가 필요합니다." },
-        { status: 400 }
+        { error: "인증이 필요합니다." },
+        { status: 401 }
       )
     }
 

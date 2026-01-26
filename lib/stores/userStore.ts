@@ -41,14 +41,25 @@ export const useUserStore = create<UserStore>((set, get) => ({
   fetchProfile: async () => {
     set({ isLoading: true, error: null })
     try {
-      const userId = localStorage.getItem('stockast_user_id')
-      const url = userId ? `/api/user/profile?userId=${userId}` : '/api/user/profile'
-      const response = await fetch(url)
-      if (!response.ok) {
-        const data = await response.json().catch(() => null)
+      const response = await fetch('/api/user/profile')
+      if (response.status === 401) {
+        const userId = localStorage.getItem('stockast_user_id')
+        if (userId) {
+          await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          }).catch(() => null)
+        }
+      }
+
+      const finalResponse = response.status === 401 ? await fetch('/api/user/profile') : response
+
+      if (!finalResponse.ok) {
+        const data = await finalResponse.json().catch(() => null)
         throw new Error(data?.error || '프로필을 불러오지 못했습니다.')
       }
-      const profile = (await response.json()) as UserProfile
+      const profile = (await finalResponse.json()) as UserProfile
       set({ profile, isLoading: false })
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Unknown error', isLoading: false })
@@ -62,15 +73,31 @@ export const useUserStore = create<UserStore>((set, get) => ({
     set({ profile: { ...profile, ...updates } })
 
     try {
-      const userId = localStorage.getItem('stockast_user_id')
-      const url = userId ? `/api/user/profile?userId=${userId}` : '/api/user/profile'
-      const response = await fetch(url, {
+      const response = await fetch('/api/user/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       })
-      if (!response.ok) {
-        const data = await response.json().catch(() => null)
+
+      if (response.status === 401) {
+        const userId = localStorage.getItem('stockast_user_id')
+        if (userId) {
+          await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          }).catch(() => null)
+        }
+      }
+
+      const finalResponse = response.status === 401 ? await fetch('/api/user/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      }) : response
+
+      if (!finalResponse.ok) {
+        const data = await finalResponse.json().catch(() => null)
         throw new Error(data?.error || '프로필 업데이트에 실패했습니다.')
       }
       await get().fetchProfile()
@@ -87,15 +114,31 @@ export const useUserStore = create<UserStore>((set, get) => ({
     set({ profile: { ...profile, ...updates } })
 
     try {
-      const userId = localStorage.getItem('stockast_user_id')
-      const url = userId ? `/api/user/profile?userId=${userId}` : '/api/user/profile'
-      const response = await fetch(url, {
+      const response = await fetch('/api/user/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       })
-      if (!response.ok) {
-        const data = await response.json().catch(() => null)
+
+      if (response.status === 401) {
+        const userId = localStorage.getItem('stockast_user_id')
+        if (userId) {
+          await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          }).catch(() => null)
+        }
+      }
+
+      const finalResponse = response.status === 401 ? await fetch('/api/user/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      }) : response
+
+      if (!finalResponse.ok) {
+        const data = await finalResponse.json().catch(() => null)
         throw new Error(data?.error || '계정 정보 업데이트에 실패했습니다.')
       }
       await get().fetchProfile()
@@ -117,15 +160,31 @@ export const useUserStore = create<UserStore>((set, get) => ({
     })
 
     try {
-      const userId = localStorage.getItem('stockast_user_id')
-      const url = userId ? `/api/user/profile?userId=${userId}` : '/api/user/profile'
-      const response = await fetch(url, {
+      const response = await fetch('/api/user/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       })
-      if (!response.ok) {
-        const data = await response.json().catch(() => null)
+
+      if (response.status === 401) {
+        const userId = localStorage.getItem('stockast_user_id')
+        if (userId) {
+          await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          }).catch(() => null)
+        }
+      }
+
+      const finalResponse = response.status === 401 ? await fetch('/api/user/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      }) : response
+
+      if (!finalResponse.ok) {
+        const data = await finalResponse.json().catch(() => null)
         throw new Error(data?.error || '설정 업데이트에 실패했습니다.')
       }
       await get().fetchProfile()

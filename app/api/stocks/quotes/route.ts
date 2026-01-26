@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { finnhub } from "@/lib/clients/finnhub"
-import { getCached, setCache, TTL } from "@/lib/cache"
+import { CACHE_KEYS, getCached, setCache, TTL } from "@/lib/cache"
 
 type Quote = {
   ticker: string
@@ -23,26 +23,30 @@ export async function GET(request: Request) {
       .filter(Boolean)
       .slice(0, 30)
 
-    const cacheKey = `quotes:${tickers.join(",")}`
-    const cached = await getCached<{ quotes: Quote[]; asOf: string }>(cacheKey)
-    if (cached) {
-      return NextResponse.json(cached)
-    }
+    const items = await Promise.all(
+      tickers.map(async (ticker) => {
+        const cacheKey = CACHE_KEYS.STOCK_QUOTE(ticker)
+        const cached = await getCached<Quote>(cacheKey)
+        if (cached) return cached
 
-    const quotes: Quote[] = []
-    for (const ticker of tickers) {
-      const q = await finnhub.getQuote(ticker)
-      if (!q) continue
-      quotes.push({
-        ticker,
-        price: q.c,
-        change: q.d,
-        changePercent: q.dp,
+        const q = await finnhub.getQuote(ticker)
+        if (!q) return null
+
+        const quote: Quote = {
+          ticker,
+          price: q.c,
+          change: q.d,
+          changePercent: q.dp,
+        }
+
+        await setCache(cacheKey, quote, TTL.STOCK_QUOTE)
+        return quote
       })
-    }
+    )
+
+    const quotes = items.filter((q): q is Quote => Boolean(q))
 
     const result = { quotes, asOf: new Date().toISOString() }
-    await setCache(cacheKey, result, TTL.STOCK_QUOTE)
     return NextResponse.json(result)
   } catch (error) {
     console.error("Stock quotes error:", error)

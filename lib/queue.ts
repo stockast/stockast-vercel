@@ -31,6 +31,18 @@ export async function scheduleDailyBriefing(date: string, forceRegenerate = fals
   )
 }
 
+export async function scheduleUserBriefing(userId: string, date: string, forceRegenerate = false) {
+  await dailyBriefingQueue.add(
+    "generate-user-briefing",
+    { userId, date, forceRegenerate },
+    {
+      jobId: `user-briefing:${userId}:${date}${forceRegenerate ? ":force" : ""}`,
+      removeOnComplete: { age: 24 * 60 * 60, count: 500 },
+      removeOnFail: { age: 7 * 24 * 60 * 60, count: 200 },
+    }
+  )
+}
+
 export async function schedulePopularityAggregation(date: string) {
   await popularityQueue.add(
     "aggregate-popularity",

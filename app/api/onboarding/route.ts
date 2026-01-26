@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { processDailyBriefing } from "@/lib/jobs/dailyBriefing"
+import { scheduleDailyBriefing } from "@/lib/queue"
+
+const STOCKAST_USER_ID_COOKIE = "stockast_uid"
 
 function getKstDateString(now: Date) {
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
@@ -94,16 +96,26 @@ export async function POST(request: Request) {
     const userCount = await db.user.count()
     if (userCount === 1) {
       const dateStr = getKstDateString(new Date())
-      processDailyBriefing({ date: dateStr }).catch((error) => {
-        console.error("Immediate briefing error:", error)
+      scheduleDailyBriefing(dateStr).catch((error) => {
+        console.error("Immediate briefing enqueue error:", error)
       })
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       userId: user.id,
       message: "회원가입이 완료되었습니다.",
     })
+
+    response.cookies.set(STOCKAST_USER_ID_COOKIE, user.id, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    })
+
+    return response
   } catch (error) {
     console.error("Onboarding error:", error)
     return NextResponse.json(

@@ -1,5 +1,5 @@
 import { Worker } from "bullmq"
-import { processDailyBriefing } from "@/lib/jobs/dailyBriefing"
+import { generateBriefingForUser, processDailyBriefing } from "@/lib/jobs/dailyBriefing"
 import { aggregatePopularity } from "@/lib/jobs/popularity"
 import { DAILY_BRIEFING_QUEUE } from "@/lib/queue"
 import { bullmqConnectionFromUrl } from "@/lib/workers/bullmqConnection"
@@ -27,6 +27,8 @@ async function startWorker() {
         let result
         if (job.name === "generate-briefing") {
           result = await processDailyBriefing(job.data)
+        } else if (job.name === "generate-user-briefing") {
+          result = await generateBriefingForUser(job.data)
         } else if (job.name === "aggregate-popularity") {
           result = await aggregatePopularity(job.data)
         }

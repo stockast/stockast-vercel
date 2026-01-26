@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { TrendingUp, Newspaper, BarChart3, ChevronRight, ChevronDown, RefreshCw, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface Briefing {
   exists: boolean
@@ -115,9 +116,6 @@ export default function HomePage() {
       } catch {
         // ignore
       }
-
-      // spread out requests (finnhub free tier)
-      await new Promise((r) => setTimeout(r, 400))
     }
   }
 
@@ -141,20 +139,14 @@ export default function HomePage() {
       } catch {
         // ignore
       }
-
-      // Finnhub free tier can be slow; don't block UI
-      await new Promise((r) => setTimeout(r, 400))
     }
   }
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const userId = localStorage.getItem('stockast_user_id')
-
-        const briefingUrl = userId ? `/api/briefings/today?userId=${userId}` : '/api/briefings/today'
         try {
-          const briefingRes = await fetch(briefingUrl)
+          const briefingRes = await fetch('/api/briefings/today')
           if (briefingRes.ok) {
             const briefingData = await briefingRes.json()
             setBriefing(briefingData)
@@ -244,13 +236,10 @@ export default function HomePage() {
   }
 
   const refreshBriefing = async () => {
-    const userId = localStorage.getItem('stockast_user_id')
-    if (!userId) return
-
     try {
       setBriefingRefreshing(true)
       setBriefingError(null)
-      const response = await fetch(`/api/briefings/today?userId=${userId}&refresh=true`)
+      const response = await fetch(`/api/briefings/today?refresh=true`)
       const data = await response.json().catch(() => null)
       if (!response.ok) {
         const message = data?.detail ? `${data.error}\n${data.detail}` : (data?.error || '브리핑 생성에 실패했습니다.')
@@ -265,15 +254,43 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-900 animate-spin" />
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-40" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-20 w-full rounded-2xl" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-44" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-11 w-full rounded-2xl" />
+            <div className="mt-3 space-y-2">
+              <Skeleton className="h-12 w-full rounded-2xl" />
+              <Skeleton className="h-12 w-full rounded-2xl" />
+              <Skeleton className="h-12 w-full rounded-2xl" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-40" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-36 w-full rounded-2xl" />
+          </CardContent>
+        </Card>
       </div>
     )
   }
   // Keep the Home UI visible; show errors as banners instead of blank screens.
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
+    <div className="space-y-6">
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}

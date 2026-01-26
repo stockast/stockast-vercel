@@ -1,24 +1,17 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { getCached, invalidateCache, setCache, TTL } from "@/lib/cache"
+import { getCached, setCache, TTL } from "@/lib/cache"
 import { getUserId } from "@/lib/auth/session"
 import { kstEditionYmd, utcDateFromYmd } from "@/lib/dates"
-import { generateBriefingForUser } from "@/lib/jobs/dailyBriefing"
+import { scheduleUserBriefing } from "@/lib/queue"
 
 export async function GET(request: Request) {
   try {
-    let userId = await getUserId()
-    
-    if (!userId) {
-      const { searchParams } = new URL(request.url)
-      const queryUserId = searchParams.get("userId")
-      userId = queryUserId || null
-    }
-
+    const userId = await getUserId()
     if (!userId) {
       return NextResponse.json(
-        { error: "userId가 필요합니다." },
-        { status: 400 }
+        { error: "인증이 필요합니다." },
+        { status: 401 }
       )
     }
 
@@ -32,22 +25,14 @@ export async function GET(request: Request) {
     const cacheKey = `briefing:${userId}:${today.toISOString()}`
 
     if (refresh) {
-      await invalidateCache(cacheKey)
-      try {
-        await generateBriefingForUser({ userId, date: ymd, forceRegenerate: force })
-      } catch (error) {
-        console.error("Briefing generate error:", error)
-        const detail = error instanceof Error ? error.message : String(error)
-        return NextResponse.json(
-          { error: "브리핑 생성에 실패했습니다.", detail },
-          { status: 500 }
-        )
-      }
+      scheduleUserBriefing(userId, ymd, force).catch((error) => {
+        console.error("Briefing enqueue error:", error)
+      })
     }
 
     const cached = await getCached(cacheKey)
     if (cached) {
-      return NextResponse.json(cached)
+      return NextResponse.json({ ...cached, queued: refresh })
     }
 
     const briefing = await db.briefing.findUnique({
@@ -74,6 +59,7 @@ export async function GET(request: Request) {
         exists: false,
         message: "오늘의 브리핑이 아직 생성되지 않았습니다.",
         nextUpdate: "새로고침을 누르면 즉시 생성합니다.",
+        queued: refresh,
       })
     }
 
@@ -88,6 +74,7 @@ export async function GET(request: Request) {
       })),
       generatedAt: briefing.createdAt,
       asOf: briefing.createdAt.toISOString(),
+      queued: refresh,
     }
 
     await setCache(cacheKey, response, TTL.BRIEFING)

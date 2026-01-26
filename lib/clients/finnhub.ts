@@ -42,7 +42,9 @@ export interface CompanyProfile {
 
 class FinnhubClient {
   private apiKey: string
-  private rateLimitDelay: number = 1000 // 60 calls/min = 1 call per second
+  private rateLimitDelay: number = 1100 // free tier is tight; keep a small buffer
+  private lastRequestAtMs = 0
+  private rateLimitChain: Promise<void> = Promise.resolve()
 
   constructor() {
     this.apiKey = env.FINNHUB_API_KEY
@@ -62,8 +64,28 @@ class FinnhubClient {
     return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
+  private async rateLimit() {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    const prev = this.rateLimitChain
+    this.rateLimitChain = prev.then(() => gate).catch(() => gate)
+
+    await prev
+
+    const now = Date.now()
+    const waitMs = Math.max(0, this.lastRequestAtMs + this.rateLimitDelay - now)
+    if (waitMs > 0) {
+      await this.delay(waitMs)
+    }
+    this.lastRequestAtMs = Date.now()
+    release()
+  }
+
   async getQuote(symbol: string): Promise<StockQuote | null> {
-    await this.delay(this.rateLimitDelay)
+    await this.rateLimit()
     try {
       return await this.request<StockQuote>("/quote", { symbol })
     } catch (error) {
@@ -73,7 +95,7 @@ class FinnhubClient {
   }
 
   async getCompanyProfile(symbol: string): Promise<CompanyProfile | null> {
-    await this.delay(this.rateLimitDelay)
+    await this.rateLimit()
     try {
       return await this.request<CompanyProfile>("/stock/profile2", { symbol })
     } catch (error) {
@@ -87,7 +109,7 @@ class FinnhubClient {
     from: string,
     to: string
   ): Promise<NewsArticle[]> {
-    await this.delay(this.rateLimitDelay)
+    await this.rateLimit()
     try {
       return await this.request<NewsArticle[]>("/company-news", {
         symbol,
@@ -101,7 +123,7 @@ class FinnhubClient {
   }
 
   async getGeneralNews(category: string = "general"): Promise<NewsArticle[]> {
-    await this.delay(this.rateLimitDelay)
+    await this.rateLimit()
     try {
       return await this.request<NewsArticle[]>("/news", { category })
     } catch (error) {
@@ -111,7 +133,7 @@ class FinnhubClient {
   }
 
   async searchSymbol(query: string): Promise<{ count: number; result: Array<{ description: string; displaySymbol: string; symbol: string; type: string }> }> {
-    await this.delay(this.rateLimitDelay)
+    await this.rateLimit()
     try {
       return await this.request("/search", { q: query })
     } catch (error) {
