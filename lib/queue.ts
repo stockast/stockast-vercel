@@ -1,5 +1,5 @@
 import { Queue } from "bullmq"
-import { env } from "@/lib/env"
+import { env, isProductionRuntime } from "@/lib/env"
 import { bullmqConnectionFromUrl } from "@/lib/workers/bullmqConnection"
 
 export const DAILY_BRIEFING_QUEUE = "daily-briefing"
@@ -14,7 +14,7 @@ function getRedisUrlOrNull(): string | null {
   if (env.REDIS_URL) return env.REDIS_URL
 
   // Avoid trying localhost Redis on Vercel/production.
-  if (env.NODE_ENV === "production") return null
+  if (isProductionRuntime()) return null
 
   return "redis://localhost:6379"
 }

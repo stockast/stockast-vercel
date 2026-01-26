@@ -2,6 +2,7 @@ import { z } from "zod"
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  VERCEL: z.string().optional(),
   
   // Database
   DATABASE_URL: z.string().min(1),
@@ -34,3 +35,7 @@ if (!_env.success) {
 }
 
 export const env = _env.data
+
+export function isProductionRuntime() {
+  return env.NODE_ENV === "production" || env.VERCEL === "1"
+}

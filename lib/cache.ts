@@ -1,5 +1,5 @@
 import Redis from "ioredis"
-import { env } from "@/lib/env"
+import { env, isProductionRuntime } from "@/lib/env"
 
 function getRedisUrlOrNull(): string | null {
   if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
@@ -10,7 +10,7 @@ function getRedisUrlOrNull(): string | null {
   if (env.REDIS_URL) return env.REDIS_URL
 
   // Avoid trying localhost Redis on Vercel/production.
-  if (env.NODE_ENV === "production") return null
+  if (isProductionRuntime()) return null
 
   return "redis://localhost:6379"
 }
