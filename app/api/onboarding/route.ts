@@ -11,10 +11,20 @@ function getKstDateString(now: Date) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const { name, email, phone, favorites, preferences } = body
+    const body = await request.json().catch(() => null)
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "요청 형식이 올바르지 않습니다." }, { status: 400 })
+    }
 
-    if (!name || !email) {
+    const { name, email, phone, favorites, preferences } = body as {
+      name?: unknown
+      email?: unknown
+      phone?: unknown
+      favorites?: unknown
+      preferences?: { style?: unknown; focus?: unknown } | undefined
+    }
+
+    if (typeof name !== "string" || typeof email !== "string" || !name || !email) {
       return NextResponse.json(
         { error: "이름과 이메일은 필수 입력 항목입니다." },
         { status: 400 }
@@ -28,7 +38,7 @@ export async function POST(request: Request) {
       )
     }
 
-    if (!favorites || favorites.length === 0) {
+    if (!Array.isArray(favorites) || favorites.length === 0) {
       return NextResponse.json(
         { error: "최소 1개 이상의 관심 종목을 선택해주세요." },
         { status: 400 }
@@ -51,25 +61,32 @@ export async function POST(request: Request) {
         data: {
           name,
           email,
-          phone: phone || null,
+          phone: typeof phone === "string" && phone.length > 0 ? phone : null,
         },
       })
 
-      await tx.userPreference.create({
-        data: {
-          userId: newUser.id,
-          language: "ko",
-          briefingStyle: preferences?.style || "concise",
-          infoPreference: preferences?.focus || "all",
-        },
-      })
+       await tx.userPreference.create({
+         data: {
+           userId: newUser.id,
+           language: "ko",
+           briefingStyle: preferences?.style === "detailed" ? "detailed" : "concise",
+           infoPreference:
+             preferences?.focus === "price" || preferences?.focus === "news" ? String(preferences.focus) : "all",
+         },
+       })
 
-      for (let i = 0; i < favorites.length; i++) {
-        const fav = favorites[i]
+       for (let i = 0; i < favorites.length; i++) {
+         const fav = favorites[i] as { ticker?: unknown; name?: unknown }
+         if (typeof fav?.ticker !== "string" || fav.ticker.length === 0) {
+           throw new Error("Invalid favorite ticker")
+         }
+         if (typeof fav?.name !== "string" || fav.name.length === 0) {
+           throw new Error("Invalid favorite name")
+         }
         
-        let stock = await tx.stock.findUnique({
-          where: { exchange_ticker: { exchange: "NASDAQ", ticker: fav.ticker } },
-        })
+         let stock = await tx.stock.findUnique({
+           where: { exchange_ticker: { exchange: "NASDAQ", ticker: fav.ticker } },
+         })
 
         if (!stock) {
           stock = await tx.stock.create({
@@ -118,8 +135,18 @@ export async function POST(request: Request) {
     return response
   } catch (error) {
     console.error("Onboarding error:", error)
+    const detail =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : JSON.stringify(error)
+
     return NextResponse.json(
-      { error: "회원가입 중 오류가 발생했습니다." },
+      {
+        error: "회원가입 중 오류가 발생했습니다.",
+        detail,
+      },
       { status: 500 }
     )
   }
