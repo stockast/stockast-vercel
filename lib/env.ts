@@ -12,10 +12,10 @@ const envSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   
   // Finnhub (Stock Data)
-  FINNHUB_API_KEY: z.string().min(1),
+  FINNHUB_API_KEY: z.string().min(1).optional(),
   
   // OpenAI (LLM)
-  OPENAI_API_KEY: z.string().min(1),
+  OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_MODEL: z.string().default("gpt-4o-mini"),
   
   // Auth
@@ -23,7 +23,7 @@ const envSchema = z.object({
   NEXTAUTH_URL: z.string().optional(),
   
   // Scheduler
-  CRON_SECRET: z.string().min(1),
+  CRON_SECRET: z.string().min(1).optional(),
 })
 
 const _env = envSchema.safeParse(process.env)
