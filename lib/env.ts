@@ -37,5 +37,5 @@ if (!_env.success) {
 export const env = _env.data
 
 export function isProductionRuntime() {
-  return env.NODE_ENV === "production" || env.VERCEL === "1"
+  return process.env.NODE_ENV === "production" || process.env.VERCEL === "1"
 }
