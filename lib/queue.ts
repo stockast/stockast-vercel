@@ -5,22 +5,47 @@ import { bullmqConnectionFromUrl } from "@/lib/workers/bullmqConnection"
 export const DAILY_BRIEFING_QUEUE = "daily-briefing"
 export const POPULARITY_QUEUE = "popularity"
 
-function getRedisUrl(): string {
+function getRedisUrlOrNull(): string | null {
   if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
     const url = new URL(env.UPSTASH_REDIS_REST_URL)
     return `rediss://:${env.UPSTASH_REDIS_REST_TOKEN}@${url.hostname}:37561`
   }
-  return env.REDIS_URL || "redis://localhost:6379"
+
+  if (env.REDIS_URL) return env.REDIS_URL
+
+  // Avoid trying localhost Redis on Vercel/production.
+  if (env.NODE_ENV === "production") return null
+
+  return "redis://localhost:6379"
 }
 
-const redisUrl = getRedisUrl()
-const connection = bullmqConnectionFromUrl(redisUrl)
+const redisUrl = getRedisUrlOrNull()
+const connection = redisUrl ? bullmqConnectionFromUrl(redisUrl) : null
 
-const dailyBriefingQueue = new Queue(DAILY_BRIEFING_QUEUE, { connection })
-const popularityQueue = new Queue(POPULARITY_QUEUE, { connection })
+let dailyBriefingQueue: Queue | null = null
+let popularityQueue: Queue | null = null
+
+function getDailyBriefingQueue() {
+  if (!connection) return null
+  if (!dailyBriefingQueue) {
+    dailyBriefingQueue = new Queue(DAILY_BRIEFING_QUEUE, { connection })
+  }
+  return dailyBriefingQueue
+}
+
+function getPopularityQueue() {
+  if (!connection) return null
+  if (!popularityQueue) {
+    popularityQueue = new Queue(POPULARITY_QUEUE, { connection })
+  }
+  return popularityQueue
+}
 
 export async function scheduleDailyBriefing(date: string, forceRegenerate = false) {
-  await dailyBriefingQueue.add(
+  const q = getDailyBriefingQueue()
+  if (!q) return
+
+  await q.add(
     "generate-briefing",
     { date, forceRegenerate },
     {
@@ -32,7 +57,10 @@ export async function scheduleDailyBriefing(date: string, forceRegenerate = fals
 }
 
 export async function scheduleUserBriefing(userId: string, date: string, forceRegenerate = false) {
-  await dailyBriefingQueue.add(
+  const q = getDailyBriefingQueue()
+  if (!q) return
+
+  await q.add(
     "generate-user-briefing",
     { userId, date, forceRegenerate },
     {
@@ -44,7 +72,10 @@ export async function scheduleUserBriefing(userId: string, date: string, forceRe
 }
 
 export async function schedulePopularityAggregation(date: string) {
-  await popularityQueue.add(
+  const q = getPopularityQueue()
+  if (!q) return
+
+  await q.add(
     "aggregate-popularity",
     { date },
     {

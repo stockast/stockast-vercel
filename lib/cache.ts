@@ -1,32 +1,44 @@
 import Redis from "ioredis"
 import { env } from "@/lib/env"
 
-// Build Redis URL from Upstash or use existing REDIS_URL
-let redisUrl = ""
-if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
-  const url = new URL(env.UPSTASH_REDIS_REST_URL)
-  redisUrl = `rediss://:${env.UPSTASH_REDIS_REST_TOKEN}@${url.hostname}:37561`
-} else {
-  redisUrl = env.REDIS_URL || "redis://localhost:6379"
+function getRedisUrlOrNull(): string | null {
+  if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
+    const url = new URL(env.UPSTASH_REDIS_REST_URL)
+    return `rediss://:${env.UPSTASH_REDIS_REST_TOKEN}@${url.hostname}:37561`
+  }
+
+  if (env.REDIS_URL) return env.REDIS_URL
+
+  // Avoid trying localhost Redis on Vercel/production.
+  if (env.NODE_ENV === "production") return null
+
+  return "redis://localhost:6379"
 }
 
-console.log(`[Cache] Redis: ${redisUrl.substring(0, 60)}...`)
+const redisUrl = getRedisUrlOrNull()
 
-const redis = new Redis(redisUrl, {
-  maxRetriesPerRequest: null,
-  retryStrategy: (times) => {
-    void times
-    return null
-  },
-})
+const redis: Redis | null = redisUrl
+  ? new Redis(redisUrl, {
+      maxRetriesPerRequest: null,
+      retryStrategy: (times) => {
+        void times
+        return null
+      },
+    })
+  : null
 
-redis.on('connect', () => {
-  console.log('[Cache] Redis connected!')
-})
+if (redisUrl) {
+  console.log(`[Cache] Redis: ${redisUrl.substring(0, 60)}...`)
+  redis?.on("connect", () => {
+    console.log("[Cache] Redis connected!")
+  })
 
-redis.on('error', (err) => {
-  console.log(`[Cache] Redis error: ${err.message}`)
-})
+  redis?.on("error", (err) => {
+    console.log(`[Cache] Redis error: ${err.message}`)
+  })
+} else {
+  console.log("[Cache] Redis disabled (no configuration)")
+}
 
 // Cache keys
 export const CACHE_KEYS = {
@@ -48,6 +60,7 @@ export const TTL = {
 // Get value from cache
 export async function getCached<T>(key: string): Promise<T | null> {
   try {
+    if (!redis) return null
     const value = await redis.get(key)
     if (!value) return null
     try {
@@ -63,6 +76,7 @@ export async function getCached<T>(key: string): Promise<T | null> {
 // Set value in cache
 export async function setCache(key: string, value: unknown, ttlSeconds: number) {
   try {
+    if (!redis) return
     await redis.setex(key, ttlSeconds, JSON.stringify(value))
   } catch {
     // ignore cache write failures
@@ -72,6 +86,7 @@ export async function setCache(key: string, value: unknown, ttlSeconds: number) 
 // Delete from cache
 export async function invalidateCache(key: string) {
   try {
+    if (!redis) return
     await redis.del(key)
   } catch {
     // ignore cache delete failures
@@ -95,6 +110,7 @@ export async function getOrSet<T>(
 // Invalidate multiple keys
 export async function invalidateMultiple(keys: string[]) {
   try {
+    if (!redis) return
     await redis.del(...keys)
   } catch {
     // ignore
@@ -104,6 +120,7 @@ export async function invalidateMultiple(keys: string[]) {
 // Health check
 export async function checkRedisHealth() {
   try {
+    if (!redis) return { healthy: false }
     await redis.ping()
     return { healthy: true }
   } catch {
