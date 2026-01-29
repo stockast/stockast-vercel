@@ -12,7 +12,7 @@ function getRedisUrlOrNull(): string | null {
   // Avoid trying localhost Redis on Vercel/production.
   if (isProductionRuntime()) return null
 
-  return "redis://localhost:6379"
+  return null
 }
 
 let redisClient: Redis | null | undefined
